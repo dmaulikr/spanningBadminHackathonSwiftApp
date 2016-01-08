@@ -12,6 +12,7 @@
 		30CAB10F1C2B4C6B000C454D /* SBLoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CAB10E1C2B4C6B000C454D /* SBLoginViewController.swift */; };
 		30CAB1131C2B5330000C454D /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CAB1121C2B5330000C454D /* User.swift */; };
 		30CAB1151C2B552F000C454D /* AuthUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CAB1141C2B552F000C454D /* AuthUtils.swift */; };
+		30D230B61C40652D00276EB0 /* SetupNotes.txt in Resources */ = {isa = PBXBuildFile; fileRef = 30D230B51C40652D00276EB0 /* SetupNotes.txt */; };
 		30E2653C1C2B0B130002C033 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30E2653B1C2B0B130002C033 /* AppDelegate.swift */; };
 		30E265411C2B0B130002C033 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 30E2653F1C2B0B130002C033 /* Main.storyboard */; };
 		30E265431C2B0B130002C033 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 30E265421C2B0B130002C033 /* Assets.xcassets */; };
@@ -54,6 +55,7 @@
 		30CAB10E1C2B4C6B000C454D /* SBLoginViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SBLoginViewController.swift; sourceTree = "<group>"; };
 		30CAB1121C2B5330000C454D /* User.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		30CAB1141C2B552F000C454D /* AuthUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthUtils.swift; sourceTree = "<group>"; };
+		30D230B51C40652D00276EB0 /* SetupNotes.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = SetupNotes.txt; sourceTree = "<group>"; };
 		30E265381C2B0B130002C033 /* SpanningBadmin-Swift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SpanningBadmin-Swift.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		30E2653B1C2B0B130002C033 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		30E265401C2B0B130002C033 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -159,6 +161,7 @@
 		30E2652F1C2B0B130002C033 = {
 			isa = PBXGroup;
 			children = (
+				30D230B51C40652D00276EB0 /* SetupNotes.txt */,
 				30E2653A1C2B0B130002C033 /* SpanningBadmin-Swift */,
 				30E2654F1C2B0B130002C033 /* SpanningBadmin-SwiftTests */,
 				30E2655A1C2B0B130002C033 /* SpanningBadmin-SwiftUITests */,
@@ -330,6 +333,7 @@
 			files = (
 				30E265461C2B0B130002C033 /* LaunchScreen.storyboard in Resources */,
 				30CAB1051C2B1756000C454D /* GoogleService-Info.plist in Resources */,
+				30D230B61C40652D00276EB0 /* SetupNotes.txt in Resources */,
 				30E265431C2B0B130002C033 /* Assets.xcassets in Resources */,
 				30E265411C2B0B130002C033 /* Main.storyboard in Resources */,
 			);

@@ -1,0 +1,286 @@
+Server set up in node using express. Needed to create an auth service that would auth a user and send back a signed cookie that can be used for further requests.
+
+//----------- Start express server api-int.js ---------------------
+
+// 3rd party modules
+var config = require('config'),
+
+logger = require('spanalog').createLogger('api_int'),
+ServerFactory = require('api-int/lib/ServerFactory'),
+ShutdownMonitor = require('spanalog/lib/ShutdownMonitor');
+
+(function() {
+'use strict';
+
+// the Express server
+var app = ServerFactory.createServer();
+
+// Start server
+app.listen(config.ports.api_int, function () {
+logger.info('Badmin server listening on port %d in %s mode', config.ports.api_int, app.get('env'));
+});
+
+// Add a function that will exit the process. Required due to underlying services which are using ShutdownMonitor
+ShutdownMonitor.addShutdownHook(function(event) {
+logger.info('Shutdown Requested [' + event + ']. Exiting now.');
+process.exit(0);
+});
+})();
+
+
+//----------- ServerFactory ---------------------
+
+/**
+* A factory for creating Express application objects configured for our internal API routes.
+* @constructor
+*/
+var ServerFactory = (function() {
+'use strict';
+
+// 3rd party modules
+var config = require('config'),
+express = require('express'),
+
+AuthRoutes = require('api-int/lib/routes').AuthRoutes,
+BatchResultRoutes = require('api-int/lib/routes').BatchResultRoutes,
+CliResultRoutes = require('api-int/lib/routes').CliResultRoutes,
+OrgRoutes = require('api-int/lib/routes').OrgRoutes,
+ProgressRoutes = require('api-int/lib/routes').ProgressRoutes,
+MaintenanceRoutes = require('api-int/lib/routes').MaintenanceRoutes,
+Routes = require('api-int/lib/routes').Routes,
+SObjectFieldExclusionRoutes = require('api-int/lib/routes').SObjectFieldExclusionRoutes;
+
+
+/**
+* Returns an express server instance properly configured for our internal API.
+*
+* @returns {Object} - An express application instance.
+*/
+var createServer = function() {
+
+// the express server
+var app;
+
+// Default node environment to development
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+
+app = express();
+
+// gives us signed cookies
+app.use(express.cookieParser('dfbdfbfb445ghnn09t'));
+app.use(express.cookieSession());
+// parses request body and puts into req.body
+app.use(express.bodyParser());
+// initializes sessions
+app.use(express.session({ secret: '23f3fsdg445ghnn09t' }));
+
+// handle mobile auth
+app.post('/mobileauth', AuthRoutes.mobileAuth);
+
+/*
+* Any handlers defined with the checkAuth middleware enforce authentication
+*/
+app.get(Routes.ORGS, AuthRoutes.checkAuth, OrgRoutes.getOrgs);
+
+return app;
+};
+
+// define our server factory object
+return {
+createServer: createServer
+};
+})();
+
+// export the server factory
+module.exports = ServerFactory;
+
+// ------------ GoogleUtils --------------------
+/**
+* @constructor
+*/
+var GoogleUtils = (function() {
+'use strict';
+
+// 3rd party modules
+var request = require('request'),
+
+logger = require('spanalog').logger();
+
+/**
+* Retrieves the certificates needed to decrypt the Google id_token containing user info.
+*
+* @param {String} kid
+* @param {Function} callback
+*/
+var getGoogleCerts = function(kid, callback) {
+request({ uri: 'https://www.googleapis.com/oauth2/v1/certs' }, function (err, response, body) {
+var keys;
+if (err) {
+err = err || 'error while retrieving the google certs';
+logger.error(err);
+callback(err, {});
+} else {
+keys = JSON.parse(body);
+callback(null, keys[kid]);
+}
+});
+};
+
+return {
+getGoogleCerts: getGoogleCerts
+};
+
+})();
+
+module.exports = GoogleUtils;
+
+//----------- AuthRoutes ---------------------
+
+/**
+* @constructor
+*/
+var AuthRoutes = (function() {
+'use strict';
+
+// Node.js modules
+var querystring = require('querystring'),
+// 3rd party modules
+config = require('config'),
+GoogleIdToken = require('google-id-token'),
+request = require('request'),
+
+GoogleUtils = require('api-int/lib/utils').GoogleUtils,
+logger = require('spanalog').logger(),
+AuthUtils = require('api-int/lib/utils').AuthUtils;
+
+/*
+* Handles the mobile auth and creates the signed cookie to send back
+*/
+var mobileAuth = function(req, res, next) {
+var bodyObj, parser,
+userType='Read Only User';
+
+bodyObj = req.body;
+parser = new GoogleIdToken({ getKeys: GoogleUtils.getGoogleCerts });
+
+// decrypt and decode the id_token sent back from Google. This contains the user profile information
+parser.decode(bodyObj.id_token, function (err, token) {
+if (err) {
+logger.error(err, 'error while parsing the google token');
+res.json(500, err.message);
+} else {
+logger.debug({ token: token }, 'successfully parsed id_token');
+
+// Make sure that the id_token is valid and the email address is from @spanning.com
+// 1. verify the our Google Client App Id matches
+if (token.data.azp !== '731228851195-ole3ff5s8isu41iavu45ohbug6u1f9mi.apps.googleusercontent.com' ||
+// 2. Verify it was issued from Google
+token.data.iss.indexOf('accounts.google.com') === -1) {
+
+res.json(401, 'Bad id token');
+return;
+}
+
+// 3. Verify a spanning.com email address
+if (!AuthUtils.isSpanningUser(token.data.email)) {
+res.json(401, 'Unauthorized');
+return;
+}
+
+// set the cookie
+res.cookie('api_int', token.data.email, { signed: true });
+res.cookie('isSuperUser', AuthUtils.isSuperUser(token.data.email));
+res.cookie('isProdSupportUser', AuthUtils.isProdSupportUser(token.data.email));
+
+if (AuthUtils.isSuperUser(token.data.email)) {
+userType = 'Super User';
+} else if (AuthUtils.isProdSupportUser(token.data.email)) {
+userType = 'Production Support User';
+}
+
+// Log this login
+logger.info('User %s authenticated as a ', token.data.email, userType);
+// all good
+res.json(200, { returnStatus: 'success' });
+}
+});
+};
+
+/**
+* Verifies the presence of the api-int signed cookie in the request. Redirects to /login if not found.
+*
+* @param {IncomingMessage} req - The HTTP request message.
+* @param {ServerResponse} res - The HTTP response.
+* @param {Function} next - Function to call the next request handler in the chain.
+*/
+var checkAuth = function(req, res, next) {
+if (req.signedCookies.api_int) {
+// disable HTTP caching
+res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+res.header('Expires', '-1');
+res.header('Pragma', 'no-cache');
+
+// forward to the next handler in the request chain.
+next();
+} else {
+logger.trace('no cookie found. User is unauthorized.');
+res.json(401, { message: 'Unauthorized' });
+}
+};
+
+/**
+* Verifies the presence of the api-int signed cookie in the request and is a super or prod user.
+* Redirects to /login if not.
+*
+* @param {IncomingMessage} req - The HTTP request message.
+* @param {ServerResponse} res - The HTTP response.
+* @param {Function} next - Function to call the next request handler in the chain.
+*/
+var checkProdSupportAuth = function(req, res, next) {
+if (req.signedCookies.api_int && (AuthUtils.isSuperUser(req.signedCookies.api_int) || AuthUtils.isProdSupportUser(req.signedCookies.api_int))) {
+// disable HTTP caching
+res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+res.header('Expires', '-1');
+res.header('Pragma', 'no-cache');
+
+// forward to the next handler in the request chain.
+next();
+} else {
+logger.trace('no cookie found. User is unauthorized.');
+res.json(401, { message: 'Unauthorized' });
+}
+};
+
+/**
+* Verifies the presence of the api-int signed cookie in the request and is a super user.
+* Redirects to /login if not.
+*
+* @param {IncomingMessage} req - The HTTP request message.
+* @param {ServerResponse} res - The HTTP response.
+* @param {Function} next - Function to call the next request handler in the chain.
+*/
+var checkSuperAuth = function(req, res, next) {
+if (req.signedCookies.api_int && AuthUtils.isSuperUser(req.signedCookies.api_int)) {
+// disable HTTP caching
+res.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+res.header('Expires', '-1');
+res.header('Pragma', 'no-cache');
+
+// forward to the next handler in the request chain.
+next();
+} else {
+logger.trace('no cookie found. User is unauthorized.');
+res.json(401, { message: 'Unauthorized' });
+}
+};
+
+return {
+checkAuth: checkAuth,
+checkProdSupportAuth: checkProdSupportAuth,
+checkSuperAuth: checkSuperAuth,
+mobileAuth: mobileAuth
+};
+
+})();
+
+module.exports = AuthRoutes;
